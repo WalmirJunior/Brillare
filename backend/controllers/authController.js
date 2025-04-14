@@ -11,8 +11,18 @@ const login = async (req, res) => {
   if (error) {
     return res.status(401).json({ error: error.message });
   }
+  const token = jwt.sign({ id: data.user.id }, process.env.JWT_SECRET, {
+    expiresIn: '1h',
+  });
 
-  return res.json({ user: data.user });
+  return res.json({
+    user: {
+      id: data.user.id,
+      email: data.user.email,
+      name: data.user.user_metadata.name,
+    },
+    token,  
+  });
 };
 
 
