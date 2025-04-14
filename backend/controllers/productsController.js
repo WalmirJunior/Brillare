@@ -25,6 +25,25 @@ const getAllProducts = async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar produtos' });
   }
 };
+const getProductById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const productRef = doc(db, 'products', id);
+    const productSnap = await getDoc(productRef);
+
+    if (!productSnap.exists()) {
+      return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+
+    const productData = productSnap.data();
+    res.status(200).json({ id: productSnap.id, ...productData });
+  } catch (error) {
+    console.error('Erro ao buscar produto:', error);
+    res.status(500).json({ error: 'Erro ao buscar produto' });
+  }
+};
+
 
 const createProduct = async (req, res) => {
   const { name, price, stock, category } = req.body;
@@ -96,5 +115,6 @@ module.exports = {
   getAllProducts,
   updateProduct,
   deleteProduct,
-  createProduct
+  createProduct,
+  getProductById 
 };
