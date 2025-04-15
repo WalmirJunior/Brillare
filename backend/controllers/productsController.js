@@ -12,12 +12,27 @@ const {
 
 const getAllProducts = async (req, res) => {
   try {
+
+    const categoriesCol = collection(db, 'categories');
+    const categoriesSnap = await getDocs(categoriesCol);
+    const categoryMap = new Map();
+    categoriesSnap.forEach(doc => {
+      categoryMap.set(doc.id, doc.data().name);
+    });
+
     const productsCol = collection(db, 'products');
-    const snapshot = await getDocs(productsCol);
-    const products = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const productsSnap = await getDocs(productsCol);
+
+    const products = productsSnap.docs.map(doc => {
+      const data = doc.data();
+      const categoryName = categoryMap.get(data.categoryId) || 'Categoria desconhecida';
+
+      return {
+        id: doc.id,
+        ...data,
+        categoryName
+      };
+    });
 
     res.status(200).json(products);
   } catch (error) {
@@ -27,7 +42,6 @@ const getAllProducts = async (req, res) => {
 };
 const getProductById = async (req, res) => {
   const { id } = req.params;
-
   try {
     const productRef = doc(db, 'products', id);
     const productSnap = await getDoc(productRef);
@@ -37,7 +51,16 @@ const getProductById = async (req, res) => {
     }
 
     const productData = productSnap.data();
-    res.status(200).json({ id: productSnap.id, ...productData });
+
+    const categoryRef = doc(db, 'categories', productData.categoryId);
+    const categorySnap = await getDoc(categoryRef);
+    const categoryName = categorySnap.exists() ? categorySnap.data().name : 'Categoria desconhecida';
+
+    res.status(200).json({
+      id: productSnap.id,
+      ...productData,
+      categoryName
+    });
   } catch (error) {
     console.error('Erro ao buscar produto:', error);
     res.status(500).json({ error: 'Erro ao buscar produto' });
@@ -45,19 +68,27 @@ const getProductById = async (req, res) => {
 };
 
 
-const createProduct = async (req, res) => {
-  const { name, price, stock, category } = req.body;
 
-  if (!name || price == null || !stock || !category) {
-    return res.status(400).json({ error: 'Nome, preço, estoque e categoria são obrigatórios' });
+const createProduct = async (req, res) => {
+  const { name, price, stock, categoryId } = req.body;
+
+  if (!name || price == null || !stock || !categoryId) {
+    return res.status(400).json({ error: 'Nome, preço, estoque e categoryId são obrigatórios' });
   }
 
   try {
+    const categoryRef = doc(db, 'categories', categoryId);
+    const categorySnap = await getDoc(categoryRef);
+
+    if (!categorySnap.exists()) {
+      return res.status(400).json({ error: 'Categoria inválida (não encontrada)' });
+    }
+
     const newProduct = {
       name,
       price: Number(price),
-      stock: stock.toString(), 
-      category,
+      stock: stock.toString(),
+      categoryId,
       createdAt: new Date()
     };
 
@@ -82,15 +113,26 @@ const updateProduct = async (req, res) => {
     if (!productSnap.exists()) {
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
-
     await updateDoc(productRef, updatedData);
 
-    res.status(200).json({ id, ...updatedData });
+    let categoryName = null;
+    if (updatedData.categoryId) {
+      const categoryRef = doc(db, 'categories', updatedData.categoryId);
+      const categorySnap = await getDoc(categoryRef);
+      categoryName = categorySnap.exists() ? categorySnap.data().name : 'Categoria desconhecida';
+    }
+
+    res.status(200).json({
+      id,
+      ...updatedData,
+      ...(categoryName && { categoryName })
+    });
   } catch (error) {
     console.error('Erro ao atualizar produto:', error);
     res.status(500).json({ error: 'Erro ao atualizar o produto' });
   }
 };
+
 
 const deleteProduct = async (req, res) => {
   const { id } = req.params;
