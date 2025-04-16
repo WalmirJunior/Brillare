@@ -8,27 +8,21 @@ const {
 } = require('firebase/auth');
 const { doc, setDoc, getDoc } = require('firebase/firestore');
 
-// 🔐 Registro
 const register = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
     await registerSchema.validate({ name, email, password });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const { data, error } = await supabase
-      .from('users')
-      .insert([{ name, email, password: hashedPassword, role: 'user' }]) // 👈 fixa aqui o role
-      .select()
-      .single();
-
-    if (error) {
-      return res.status(500).json({ error: 'Erro ao registrar usuário' });
-    }
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    await setDoc(doc(db, 'users', user.uid), {
+      name,
+      email,
+      role: 'user',
+    });
 
     const token = jwt.sign(
-      { id: data.id, role: 'user' }, 
+      { id: user.uid, role: 'user' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -36,21 +30,20 @@ const register = async (req, res) => {
     res.status(201).json({
       message: 'Usuário registrado com sucesso',
       user: {
-        id: data.id,
-        name: data.name,
-        email: data.email,
+        id: user.uid,
+        name,
+        email,
         role: 'user',
       },
       token,
     });
 
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    console.error('Erro no registro:', err);
+    res.status(400).json({ error: err.message });
   }
 };
 
-
-// 🔓 Login
 const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -58,13 +51,17 @@ const login = async (req, res) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // Busca o nome do user no Firestore
     const docRef = doc(db, 'users', user.uid);
     const docSnap = await getDoc(docRef);
     const userData = docSnap.exists() ? docSnap.data() : {};
     const name = userData.name || null;
     const role = userData.role || 'user'; 
-    const token = jwt.sign({ id: user.uid }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign(
+      { id: user.uid, role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+    
 
     res.json({
       user: {
