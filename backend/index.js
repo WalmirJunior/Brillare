@@ -4,11 +4,15 @@ const app = express();
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require ('./routes/productsRoutes')
 const categoriesRoutes = require('./routes/categoriesRoutes');
+const ordersRoutes = require('./routes/ordersRoutes'); 
+
+
 
 app.use(express.json()); 
 app.use('/', authRoutes); 
 app.use('/products', productRoutes);
 app.use('/categories', categoriesRoutes);
+app.use('/orders', ordersRoutes);
 
 app.listen(3001, () => {
   console.log('Servidor rodando na porta 3001');
