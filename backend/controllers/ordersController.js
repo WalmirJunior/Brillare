@@ -87,7 +87,6 @@ const getUserOrders = async (req, res) => {
     try {
       const orderRef = doc(db, 'orders', orderId);
       const orderSnap = await getDoc(orderRef);
-  
       if (!orderSnap.exists()) {
         return res.status(404).json({ error: 'Pedido não encontrado' });
       }
