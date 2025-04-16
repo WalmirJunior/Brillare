@@ -15,30 +15,40 @@ const register = async (req, res) => {
   try {
     await registerSchema.validate({ name, email, password });
 
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Salva o nome no Firestore
-    await setDoc(doc(db, 'users', user.uid), {
-      name,
-      email
-    });
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{ name, email, password: hashedPassword, role: 'user' }]) // 👈 fixa aqui o role
+      .select()
+      .single();
 
-    const token = jwt.sign({ id: user.uid }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    if (error) {
+      return res.status(500).json({ error: 'Erro ao registrar usuário' });
+    }
+
+    const token = jwt.sign(
+      { id: data.id, role: 'user' }, 
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
 
     res.status(201).json({
       message: 'Usuário registrado com sucesso',
       user: {
-        id: user.uid,
-        name,
-        email
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: 'user',
       },
-      token
+      token,
     });
+
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 };
+
 
 // 🔓 Login
 const login = async (req, res) => {
@@ -51,16 +61,17 @@ const login = async (req, res) => {
     // Busca o nome do user no Firestore
     const docRef = doc(db, 'users', user.uid);
     const docSnap = await getDoc(docRef);
-
-    const name = docSnap.exists() ? docSnap.data().name : null;
-
+    const userData = docSnap.exists() ? docSnap.data() : {};
+    const name = userData.name || null;
+    const role = userData.role || 'user'; 
     const token = jwt.sign({ id: user.uid }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     res.json({
       user: {
         id: user.uid,
         email: user.email,
-        name
+        name,
+        role
       },
       token
     });

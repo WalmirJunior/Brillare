@@ -8,10 +8,12 @@ const {
 } = require('../controllers/categoriesController');
 
 const authenticateToken = require('../middlewares/authMiddleware');
+const isAdmin = require('../middlewares/isAdmin');
 
 router.get('/', authenticateToken, getAllCategories);
-router.post('/', authenticateToken, createCategory);
-router.put('/:id', authenticateToken, updateCategory);
-router.delete('/:id', authenticateToken, deleteCategory);
+
+router.post('/', authenticateToken, isAdmin, createCategory);
+router.put('/:id', authenticateToken, isAdmin, updateCategory);
+router.delete('/:id', authenticateToken, isAdmin, deleteCategory);
 
 module.exports = router;
