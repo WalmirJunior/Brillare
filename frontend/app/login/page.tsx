@@ -3,24 +3,28 @@
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
 import { login } from "@/services/authService"
 
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const data = await login(email, password);
       localStorage.setItem("token", data.token);
-      console.log('ta prestando')
+      router.push("/home"); 
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || "Erro ao fazer login");
     }
   };
+  
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -59,6 +63,10 @@ export default function LoginPage() {
             <Button type="submit" className="mt-4 w-full">
               Entrar
             </Button>
+            <p className="text-sm text-center">
+              Não tem conta? <a href="/register" className="text-primary underline">Cadastre-se</a>
+            </p>
+
           </form>
         </CardContent>
       </Card>

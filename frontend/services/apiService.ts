@@ -1,10 +1,8 @@
-// services/apiService.ts
-
 const API_BASE_URL = "http://localhost:3001";
 
 export async function apiRequest<T = any>(
   endpoint: string,
-  method: string = "GET",
+  method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
   data?: any,
   token?: string
 ): Promise<T> {
@@ -16,11 +14,16 @@ export async function apiRequest<T = any>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const options: RequestInit = {
     method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
-  });
+  };
+
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
+
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, options);
 
   if (!res.ok) {
     const errorData = await res.json();
@@ -29,3 +32,17 @@ export async function apiRequest<T = any>(
 
   return res.json();
 }
+
+export const api = {
+  get: <T>(endpoint: string, token?: string) =>
+    apiRequest<T>(endpoint, "GET", undefined, token),
+
+  post: <T>(endpoint: string, data: any, token?: string) =>
+    apiRequest<T>(endpoint, "POST", data, token),
+
+  put: <T>(endpoint: string, data: any, token?: string) =>
+    apiRequest<T>(endpoint, "PUT", data, token),
+
+  delete: <T>(endpoint: string, token?: string) =>
+    apiRequest<T>(endpoint, "DELETE", undefined, token),
+};
