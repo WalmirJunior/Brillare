@@ -1,28 +1,16 @@
-const { db } = require('../services/firebaseConfig');
-const {
-  collection,
-  addDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDoc
-} = require('firebase/firestore');
+const supabase = require('../services/supabaseClient');
 
 const getAllCategories = async (req, res) => {
-  try {
-    const categoriesCol = collection(db, 'categories');
-    const snapshot = await getDocs(categoriesCol);
-    const categories = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*');
 
-    res.status(200).json(categories);
-  } catch (error) {
+  if (error) {
     console.error('Erro ao buscar categorias:', error);
-    res.status(500).json({ error: 'Erro ao buscar categorias' });
+    return res.status(500).json({ error: 'Erro ao buscar categorias' });
   }
+
+  res.status(200).json(data);
 };
 
 
@@ -33,16 +21,18 @@ const createCategory = async (req, res) => {
     return res.status(400).json({ error: 'Nome da categoria é obrigatório' });
   }
 
-  try {
-    const newCategory = { name, createdAt: new Date() };
-    const categoriesCol = collection(db, 'categories');
-    const docRef = await addDoc(categoriesCol, newCategory);
+  const { data, error } = await supabase
+    .from('categories')
+    .insert([{ name }])
+    .select()
+    .single();
 
-    res.status(201).json({ id: docRef.id, ...newCategory });
-  } catch (error) {
+  if (error) {
     console.error('Erro ao criar categoria:', error);
-    res.status(500).json({ error: 'Erro ao criar categoria' });
+    return res.status(500).json({ error: 'Erro ao criar categoria' });
   }
+
+  res.status(201).json(data);
 };
 
 
@@ -54,41 +44,46 @@ const updateCategory = async (req, res) => {
     return res.status(400).json({ error: 'Nome da categoria é obrigatório' });
   }
 
-  try {
-    const categoryRef = doc(db, 'categories', id);
-    const categorySnap = await getDoc(categoryRef);
+  const { data, error } = await supabase
+    .from('categories')
+    .update({ name })
+    .eq('id', id)
+    .select()
+    .single();
 
-    if (!categorySnap.exists()) {
-      return res.status(404).json({ error: 'Categoria não encontrada' });
-    }
-
-    await updateDoc(categoryRef, { name });
-
-    res.status(200).json({ id, name });
-  } catch (error) {
+  if (error) {
     console.error('Erro ao atualizar categoria:', error);
-    res.status(500).json({ error: 'Erro ao atualizar categoria' });
+    return res.status(500).json({ error: 'Erro ao atualizar categoria' });
   }
+
+  if (!data) {
+    return res.status(404).json({ error: 'Categoria não encontrada' });
+  }
+
+  res.status(200).json(data);
 };
 
 
 const deleteCategory = async (req, res) => {
   const { id } = req.params;
 
-  try {
-    const categoryRef = doc(db, 'categories', id);
-    const categorySnap = await getDoc(categoryRef);
+  const { data, error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id)
+    .select()
+    .single();
 
-    if (!categorySnap.exists()) {
-      return res.status(404).json({ error: 'Categoria não encontrada' });
-    }
-
-    await deleteDoc(categoryRef);
-    res.status(200).json({ message: 'Categoria deletada com sucesso' });
-  } catch (error) {
+  if (error) {
     console.error('Erro ao deletar categoria:', error);
-    res.status(500).json({ error: 'Erro ao deletar categoria' });
+    return res.status(500).json({ error: 'Erro ao deletar categoria' });
   }
+
+  if (!data) {
+    return res.status(404).json({ error: 'Categoria não encontrada' });
+  }
+
+  res.status(200).json({ message: 'Categoria deletada com sucesso' });
 };
 
 module.exports = {

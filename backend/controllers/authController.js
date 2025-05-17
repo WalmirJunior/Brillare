@@ -1,28 +1,36 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const yup = require('yup');
-const { auth, db } = require('../services/firebaseConfig');
-const {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword
-} = require('firebase/auth');
-const { doc, setDoc, getDoc } = require('firebase/firestore');
+const supabase = require('../services/supabaseClient');
 
 const register = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
     await registerSchema.validate({ name, email, password });
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    await setDoc(doc(db, 'users', user.uid), {
-      name,
-      email,
-      role: 'user',
-    });
+
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'Email já cadastrado' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{ name, email, password: hashedPassword, role: 'user' }])
+      .select()
+      .single();
+
+    if (error) throw error;
 
     const token = jwt.sign(
-      { id: user.uid, role: 'user' },
+      { id: data.id, role: data.role },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -30,16 +38,15 @@ const register = async (req, res) => {
     res.status(201).json({
       message: 'Usuário registrado com sucesso',
       user: {
-        id: user.uid,
-        name,
-        email,
-        role: 'user',
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
       },
       token,
     });
-
   } catch (err) {
-    console.error('Erro no registro:', err);
+    console.error('Erro no registro:', err.message);
     res.status(400).json({ error: err.message });
   }
 };
@@ -48,32 +55,39 @@ const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
 
-    const docRef = doc(db, 'users', user.uid);
-    const docSnap = await getDoc(docRef);
-    const userData = docSnap.exists() ? docSnap.data() : {};
-    const name = userData.name || null;
-    const role = userData.role || 'user'; 
+    if (error || !user) {
+      return res.status(401).json({ error: 'Email ou senha inválidos' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Email ou senha inválidos' });
+    }
+
     const token = jwt.sign(
-      { id: user.uid, role },
+      { id: user.id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
-    
 
     res.json({
       user: {
-        id: user.uid,
+        id: user.id,
+        name: user.name,
         email: user.email,
-        name,
-        role
+        role: user.role,
       },
-      token
+      token,
     });
   } catch (err) {
-    res.status(401).json({ error: 'Email ou senha inválidos' });
+    console.error('Erro no login:', err.message);
+    res.status(500).json({ error: 'Erro ao fazer login' });
   }
 };
 

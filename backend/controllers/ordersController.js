@@ -1,137 +1,196 @@
-const { db } = require('../services/firebaseConfig');
+const supabase = require('../services/supabaseClient');
 const { v4: uuidv4 } = require('uuid');
-const { doc, setDoc, collection, query, where, getDocs, orderBy,getDoc, updateDoc, deleteDoc  } = require('firebase/firestore');
 
 const createOrder = async (req, res) => {
-    const { items } = req.body;
-    const userId = req.user.id;
-  
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Itens são obrigatórios' });
-    }
-  
-    try {
-      for (const item of items) {
-        const productRef = doc(db, 'products', item.productId);
-        const productSnap = await getDoc(productRef);
-  
-        if (!productSnap.exists()) {
-          return res.status(404).json({ error: `Produto com ID ${item.productId} não encontrado` });
-        }
-  
-        const productData = productSnap.data();
-  
-        if (productData.stock < item.quantity) {
-          return res.status(400).json({ error: `Estoque insuficiente para o produto: ${productData.name}` });
-        }
-        await updateDoc(productRef, {
-          stock: productData.stock - item.quantity,
-        });
+  const { items } = req.body;
+  const userId = req.user.id;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Itens são obrigatórios' });
+  }
+
+  try {
+
+    const orderId = uuidv4();
+    const { error: orderError } = await supabase
+      .from('orders')
+      .insert([{ id: orderId, user_id: userId, created_at: new Date().toISOString(), status: 'pendente' }]);
+    if (orderError) throw orderError;
+
+    for (const item of items) {
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('id, stock, price, name')
+        .eq('id', item.productId)
+        .single();
+
+      if (productError || !product) {
+        return res.status(404).json({ error: `Produto com ID ${item.productId} não encontrado` });
       }
 
-      const orderId = uuidv4();
-      const newOrder = {
-        userId,
-        createdAt: new Date().toISOString(),
-        status: 'pendente',
-        items,
-      };
-  
-      const orderRef = doc(db, 'orders', orderId);
-      await setDoc(orderRef, newOrder);
-  
-      res.status(201).json({ message: 'Pedido criado com sucesso', orderId });
-    } catch (error) {
-      console.error("Erro ao criar pedido:", error);
-      res.status(500).json({ error: 'Erro ao criar pedido' });
+      if (product.stock < item.quantity) {
+        return res.status(400).json({ error: `Estoque insuficiente para o produto: ${product.name}` });
+      }
+
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .insert([{
+          order_id: orderId,
+          product_id: product.id,
+          quantity: item.quantity,
+          price: product.price,
+        }]);
+      if (itemError) throw itemError;
+
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ stock: product.stock - item.quantity })
+        .eq('id', product.id);
+      if (updateError) throw updateError;
     }
-  };
+
+    res.status(201).json({ message: 'Pedido criado com sucesso', orderId });
+  } catch (error) {
+    console.error('Erro ao criar pedido:', error);
+    res.status(500).json({ error: 'Erro ao criar pedido' });
+  }
+};
 
 const getUserOrders = async (req, res) => {
-    const userId = req.user.id;
-  
-    try {
-      const ordersRef = collection(db, 'orders');
-      const q = query(ordersRef, where('userId', '==', userId), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  
-      res.json(orders);
-    } catch (error) {
-      console.error("Erro ao buscar pedidos:", error);
-      res.status(500).json({ error: 'Erro ao buscar pedidos do usuário' });
+  const userId = req.user.id;
+
+  try {
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (ordersError) throw ordersError;
+
+    for (const order of orders) {
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, price')
+        .eq('order_id', order.id);
+      if (itemsError) throw itemsError;
+
+      order.items = items;
     }
-  };
-  
-  const getAllOrders = async (req, res) => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Acesso negado' });
-    }
-  
-    try {
-      const ordersRef = collection(db, 'orders');
-      const q = query(ordersRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  
-      res.json(orders);
-    } catch (error) {
-      console.error("Erro ao buscar todos os pedidos:", error);
-      res.status(500).json({ error: 'Erro ao buscar todos os pedidos' });
-    }
-  };
-  const deleteUserOrder = async (req, res) => {
-    const userId = req.user.id;
-    const { orderId } = req.params;
-  
-    try {
-      const orderRef = doc(db, 'orders', orderId);
-      const orderSnap = await getDoc(orderRef);
-      if (!orderSnap.exists()) {
-        return res.status(404).json({ error: 'Pedido não encontrado' });
-      }
-  
-      const orderData = orderSnap.data();
-  
-      if (orderData.userId !== userId) {
-        return res.status(403).json({ error: 'Você não tem permissão para deletar este pedido' });
-      }
-  
-      await deleteDoc(orderRef);
-      res.json({ message: 'Pedido deletado com sucesso' });
-    } catch (error) {
-      console.error('Erro ao deletar pedido do usuário:', error);
-      res.status(500).json({ error: 'Erro ao deletar pedido' });
-    }
-  };
-  const deleteAnyOrder = async (req, res) => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Acesso negado' });
-    }
-  
-    const { orderId } = req.params;
-  
-    try {
-      const orderRef = doc(db, 'orders', orderId);
-      const orderSnap = await getDoc(orderRef);
-  
-      if (!orderSnap.exists()) {
-        return res.status(404).json({ error: 'Pedido não encontrado' });
-      }
-  
-      await deleteDoc(orderRef);
-      res.json({ message: 'Pedido deletado com sucesso' });
-    } catch (error) {
-      console.error('Erro ao deletar pedido como admin:', error);
-      res.status(500).json({ error: 'Erro ao deletar pedido' });
-    }
-  };
-  
-module.exports = {
-    createOrder,
-    getUserOrders,
-    getAllOrders,
-    deleteAnyOrder,
-    deleteUserOrder
+
+    res.json(orders);
+  } catch (error) {
+    console.error('Erro ao buscar pedidos:', error);
+    res.status(500).json({ error: 'Erro ao buscar pedidos do usuário' });
+  }
 };
-  
+
+const getAllOrders = async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+
+  try {
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (ordersError) throw ordersError;
+
+    for (const order of orders) {
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, price')
+        .eq('order_id', order.id);
+      if (itemsError) throw itemsError;
+
+      order.items = items;
+    }
+
+    res.json(orders);
+  } catch (error) {
+    console.error('Erro ao buscar todos os pedidos:', error);
+    res.status(500).json({ error: 'Erro ao buscar todos os pedidos' });
+  }
+};
+
+
+const deleteUserOrder = async (req, res) => {
+  const userId = req.user.id;
+  const { orderId } = req.params;
+
+  try {
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    if (order.user_id !== userId) {
+      return res.status(403).json({ error: 'Você não tem permissão para deletar este pedido' });
+    }
+
+    const { error: delItemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', orderId);
+    if (delItemsError) throw delItemsError;
+
+    const { error: delOrderError } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId);
+    if (delOrderError) throw delOrderError;
+
+    res.json({ message: 'Pedido deletado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao deletar pedido do usuário:', error);
+    res.status(500).json({ error: 'Erro ao deletar pedido' });
+  }
+};
+
+const deleteAnyOrder = async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+
+  const { orderId } = req.params;
+
+  try {
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+    if (orderError || !order) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    const { error: delItemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('order_id', orderId);
+    if (delItemsError) throw delItemsError;
+
+    const { error: delOrderError } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId);
+    if (delOrderError) throw delOrderError;
+
+    res.json({ message: 'Pedido deletado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao deletar pedido como admin:', error);
+    res.status(500).json({ error: 'Erro ao deletar pedido' });
+  }
+};
+
+module.exports = {
+  createOrder,
+  getUserOrders,
+  getAllOrders,
+  deleteUserOrder,
+  deleteAnyOrder
+};
