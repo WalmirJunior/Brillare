@@ -1,101 +1,75 @@
-const { db } = require('../services/firebaseConfig');
-
-const {
-  collection,
-  addDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDoc
-} = require('firebase/firestore');
+const supabase = require('../services/supabaseClient');
 
 const getAllProducts = async (req, res) => {
   try {
+    const { data: products, error: productError } = await supabase.from('products').select('*');
+    const { data: categories } = await supabase.from('categories').select('id, name');
 
-    const categoriesCol = collection(db, 'categories');
-    const categoriesSnap = await getDocs(categoriesCol);
-    const categoryMap = new Map();
-    categoriesSnap.forEach(doc => {
-      categoryMap.set(doc.id, doc.data().name);
-    });
+    if (productError) throw productError;
 
-    const productsCol = collection(db, 'products');
-    const productsSnap = await getDocs(productsCol);
+    const categoryMap = new Map(categories.map(c => [c.id, c.name]));
 
-    const products = productsSnap.docs.map(doc => {
-      const data = doc.data();
-      const categoryName = categoryMap.get(data.categoryId) || 'Categoria desconhecida';
+    const enrichedProducts = products.map(product => ({
+      ...product,
+      categoryName: categoryMap.get(product.category_id) || 'Categoria desconhecida'
+    }));
 
-      return {
-        id: doc.id,
-        ...data,
-        categoryName
-      };
-    });
-
-    res.status(200).json(products);
+    res.status(200).json(enrichedProducts);
   } catch (error) {
     console.error('Erro ao buscar produtos:', error);
     res.status(500).json({ error: 'Erro ao buscar produtos' });
   }
 };
+
 const getProductById = async (req, res) => {
   const { id } = req.params;
+
   try {
-    const productRef = doc(db, 'products', id);
-    const productSnap = await getDoc(productRef);
+    const { data: product, error } = await supabase.from('products').select('*').eq('id', id).single();
+    if (error || !product) return res.status(404).json({ error: 'Produto não encontrado' });
 
-    if (!productSnap.exists()) {
-      return res.status(404).json({ error: 'Produto não encontrado' });
-    }
-
-    const productData = productSnap.data();
-
-    const categoryRef = doc(db, 'categories', productData.categoryId);
-    const categorySnap = await getDoc(categoryRef);
-    const categoryName = categorySnap.exists() ? categorySnap.data().name : 'Categoria desconhecida';
-
-    res.status(200).json({
-      id: productSnap.id,
-      ...productData,
-      categoryName
-    });
+    const { data: category } = await supabase.from('categories').select('name').eq('id', product.category_id).single();
+    res.status(200).json({ ...product, categoryName: category?.name || 'Categoria desconhecida' });
   } catch (error) {
     console.error('Erro ao buscar produto:', error);
     res.status(500).json({ error: 'Erro ao buscar produto' });
   }
 };
 
-
-
 const createProduct = async (req, res) => {
-  const { name, price, stock, categoryId } = req.body;
+  const { name, price, stock, categoryId, description, image_url } = req.body;
 
-  if (!name || price == null || !stock || !categoryId) {
+  if (!name || price == null || stock == null || !categoryId) {
     return res.status(400).json({ error: 'Nome, preço, estoque e categoryId são obrigatórios' });
   }
 
   try {
-    const categoryRef = doc(db, 'categories', categoryId);
-    const categorySnap = await getDoc(categoryRef);
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', categoryId)
+      .single();
 
-    if (!categorySnap.exists()) {
+    if (categoryError || !category) {
       return res.status(400).json({ error: 'Categoria inválida (não encontrada)' });
     }
 
-    const newProduct = {
-      name,
-      price: Number(price),
-      stock: stock.toString(),
-      categoryId,
-      createdAt: new Date()
-    };
+    const { data, error } = await supabase
+      .from('products')
+      .insert({
+        name,
+        price: Number(price),
+        stock: Number(stock),
+        category_id: categoryId,
+        description,
+        image_url,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
 
-    const productsCol = collection(db, 'products');
-    const docRef = await addDoc(productsCol, newProduct);
-
-    res.status(201).json({ id: docRef.id, ...newProduct });
+    if (error) throw error;
+    res.status(201).json(data);
   } catch (error) {
     console.error('Erro ao criar produto:', error);
     res.status(500).json({ error: 'Erro ao criar produto' });
@@ -107,45 +81,29 @@ const updateProduct = async (req, res) => {
   const updatedData = req.body;
 
   try {
-    const productRef = doc(db, 'products', id);
-    const productSnap = await getDoc(productRef);
+    const { data: existing, error: existingError } = await supabase.from('products').select('*').eq('id', id).single();
+    if (existingError || !existing) return res.status(404).json({ error: 'Produto não encontrado' });
 
-    if (!productSnap.exists()) {
-      return res.status(404).json({ error: 'Produto não encontrado' });
-    }
-    await updateDoc(productRef, updatedData);
+    const { data, error } = await supabase.from('products').update(updatedData).eq('id', id).select().single();
+    if (error) throw error;
 
-    let categoryName = null;
-    if (updatedData.categoryId) {
-      const categoryRef = doc(db, 'categories', updatedData.categoryId);
-      const categorySnap = await getDoc(categoryRef);
-      categoryName = categorySnap.exists() ? categorySnap.data().name : 'Categoria desconhecida';
-    }
-
-    res.status(200).json({
-      id,
-      ...updatedData,
-      ...(categoryName && { categoryName })
-    });
+    res.status(200).json(data);
   } catch (error) {
     console.error('Erro ao atualizar produto:', error);
     res.status(500).json({ error: 'Erro ao atualizar o produto' });
   }
 };
 
-
 const deleteProduct = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const productRef = doc(db, 'products', id);
-    const productSnap = await getDoc(productRef);
+    const { data: existing, error: fetchError } = await supabase.from('products').select('id').eq('id', id).single();
+    if (fetchError || !existing) return res.status(404).json({ error: 'Produto não encontrado' });
 
-    if (!productSnap.exists()) {
-      return res.status(404).json({ error: 'Produto não encontrado' });
-    }
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) throw error;
 
-    await deleteDoc(productRef);
     res.status(200).json({ message: 'Produto deletado com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar produto:', error);
@@ -155,8 +113,8 @@ const deleteProduct = async (req, res) => {
 
 module.exports = {
   getAllProducts,
-  updateProduct,
-  deleteProduct,
+  getProductById,
   createProduct,
-  getProductById 
+  updateProduct,
+  deleteProduct
 };
