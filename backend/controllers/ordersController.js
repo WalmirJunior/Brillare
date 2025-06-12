@@ -1,6 +1,8 @@
 const supabase = require('../services/supabaseClient');
 const { v4: uuidv4 } = require('uuid');
 
+
+
 const createOrder = async (req, res) => {
   const { items } = req.body;
   const userId = req.user.id;
@@ -10,12 +12,9 @@ const createOrder = async (req, res) => {
   }
 
   try {
-
-    const orderId = uuidv4();
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert([{ id: orderId, user_id: userId, created_at: new Date().toISOString(), status: 'pendente' }]);
-    if (orderError) throw orderError;
+    
+    let total = 0;
+    const productsCache = {};
 
     for (const item of items) {
       const { data: product, error: productError } = await supabase
@@ -31,6 +30,30 @@ const createOrder = async (req, res) => {
       if (product.stock < item.quantity) {
         return res.status(400).json({ error: `Estoque insuficiente para o produto: ${product.name}` });
       }
+
+      total += product.price * item.quantity;
+      productsCache[item.productId] = product;
+    }
+
+    const { data: creditData, error: creditError } = await supabase
+      .from('user_credits')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (creditError || !creditData || creditData.balance < total) {
+      return res.status(400).json({ error: 'Saldo de créditos insuficiente' });
+    }
+
+    
+    const orderId = uuidv4();
+    const { error: orderError } = await supabase
+      .from('orders')
+      .insert([{ id: orderId, user_id: userId, created_at: new Date().toISOString(), status: 'pendente' }]);
+    if (orderError) throw orderError;
+
+    for (const item of items) {
+      const product = productsCache[item.productId];
 
       const { error: itemError } = await supabase
         .from('order_items')
@@ -48,6 +71,12 @@ const createOrder = async (req, res) => {
         .eq('id', product.id);
       if (updateError) throw updateError;
     }
+
+  
+    await supabase
+      .from('user_credits')
+      .update({ balance: creditData.balance - total })
+      .eq('user_id', userId);
 
     res.status(201).json({ message: 'Pedido criado com sucesso', orderId });
   } catch (error) {
