@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getAllProducts } from "@/services/productService"
+import Carousel from "@/components/Carousel"
+import ProductCard from "@/components/ProductCard"
 
 export default function HomePage() {
   const [products, setProducts] = useState<any[]>([])
@@ -23,23 +25,32 @@ export default function HomePage() {
       })
   }, [])
 
+  const carouselImages = [
+    "images/banner1.png",
+    "images/banner2.jpg",
+    "images/banner3.jpg"
+  ]
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
-      <div className="text-center space-y-4 mb-6">
-        <h1 className="text-3xl font-bold text-primary">Bem-vindo à Brillare ✨</h1>
-        <p className="text-muted-foreground">Você está logado com sucesso!</p>
+    <main className="min-h-screen flex flex-col bg-background ">
+      <div className="w-full mt-2 mb-8">
+        <Carousel images={carouselImages} />
       </div>
 
       <div className="w-full max-w-2xl">
-        <h2 className="text-xl font-semibold mb-3">Produtos disponíveis:</h2>
-        <ul className="space-y-3">
-          {products.map((product, index) => (
-            <li key={index} className="p-4 border rounded-lg shadow bg-white">
-              <strong className="block text-lg">{product.name}</strong>
-              <span className="text-muted-foreground">Preço: R${product.price}</span>
-            </li>
-          ))}
-        </ul>
+        <h2 className="text-xl font-semibold mx-5 mb-3">Produtos disponíveis:</h2>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  {products.map((product) => (
+    <li key={product.id}>
+      <ProductCard
+        id={product.id}
+        name={product.name}
+        price={product.price}
+        imageUrl={"/images/products/ourobranco.jpg" }
+      />
+    </li>
+  ))}
+</ul>
       </div>
     </main>
   )
