@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { getAllProducts } from "@/services/productService"
 import Carousel from "@/components/Carousel"
 import ProductCard from "@/components/ProductCard"
+import Sidebar from "@/components/Sidebar"
+import FixedMenu from "@/components/FixedMenu"
 
 export default function HomePage() {
   const [products, setProducts] = useState<any[]>([])
@@ -32,25 +34,27 @@ export default function HomePage() {
   ]
 
   return (
-    <main className="min-h-screen flex flex-col bg-background ">
-      <div className="w-full mt-2 mb-8">
+    <main className="min-h-screen flex flex-col bg-background relative">
+      <FixedMenu />
+
+      <div className="w-full mb-8">
         <Carousel images={carouselImages} />
       </div>
 
-      <div className="w-full max-w-2xl">
-        <h2 className="text-xl font-semibold mx-5 mb-3">Produtos disponíveis:</h2>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-  {products.map((product) => (
-    <li key={product.id}>
-      <ProductCard
-        id={product.id}
-        name={product.name}
-        price={product.price}
-        imageUrl={"/images/products/ourobranco.jpg" }
-      />
-    </li>
-  ))}
-</ul>
+      <div className="w-full max-w-5xl mx-auto">
+        <h2 className="text-xl font-semibold mb-3">Produtos disponíveis:</h2>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {products.map((product) => (
+            <li key={product.id}>
+              <ProductCard
+                id={product.id}
+                name={product.name}
+                price={product.price}
+                imageUrl={"/images/products/ourobranco.jpg"}
+              />
+            </li>
+          ))}
+        </ul>
       </div>
     </main>
   )
