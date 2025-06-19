@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createOrder, getUserOrders } from "@/services/orderService"
+import FixedMenu from "@/components/FixedMenu"
 
 interface CartItem {
   id: string
@@ -98,6 +99,7 @@ export default function CartPage() {
 
   return (
     <main className="min-h-screen p-6 bg-background">
+      <div className="my-25"><FixedMenu/></div>
       <h1 className="text-2xl font-bold mb-6">Seu Carrinho</h1>
       
       <button 

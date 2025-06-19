@@ -6,6 +6,7 @@ import { getProductById } from "@/services/productService"
 import { useCart } from "../../context/CartContext"
 import Breadcrumb from "@/components/Breadcrumb"
 import Gallery from "@/components/GalleryProps"
+import FixedMenu from "@/components/FixedMenu"
 
 interface Product {
   id: string
@@ -13,6 +14,7 @@ interface Product {
   price: number
   description?: string
   image_url?: string  
+  image_urls?: string[] 
   categoryName?: string
 }
 
@@ -53,13 +55,14 @@ export default function ProductPage() {
       name: product.name,
       price: product.price,
       quantity,
-      imageUrl: product.image_url
+      imageUrl: product.image_url // Pode usar a principal no carrinho
     })
     alert("Produto adicionado ao carrinho!")
   }
 
   return (
     <main className="min-h-screen p-6 bg-background">
+      <FixedMenu/>
       <Breadcrumb 
         categoryName={product.categoryName}
         productName={product.name}
@@ -69,14 +72,14 @@ export default function ProductPage() {
         {product.description && (
           <p className="text-sm">{product.description}</p>
         )}
-        <div className="flex">
+        <div className="flex flex-col md:flex-row gap-6">
           <div className="max-w-lg w-full bg-white rounded-lg shadow p-6 space-y-4">
             <Gallery
-              images={[
-                "/images/products/ourobranco.jpg",
-                "/images/products/ourobranco2.jpg",
-                "/images/products/ourobranco3.jpg",
-              ]}
+              images={
+                product.image_urls && product.image_urls.length > 0
+                  ? product.image_urls
+                  : [product.image_url || "/images/placeholder.png"]
+              }
             />
           </div>
           <div className="p-4 space-y-4">

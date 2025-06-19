@@ -8,8 +8,15 @@ import ProductCard from "@/components/ProductCard"
 import Sidebar from "@/components/Sidebar"
 import FixedMenu from "@/components/FixedMenu"
 
+interface Product {
+  id: string
+  name: string
+  price: number
+  image_url?: string
+}
+
 export default function HomePage() {
-  const [products, setProducts] = useState<any[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -43,14 +50,18 @@ export default function HomePage() {
 
       <div className="w-full max-w-5xl mx-auto">
         <h2 className="text-xl font-semibold mb-3">Produtos disponíveis:</h2>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-5">
           {products.map((product) => (
             <li key={product.id}>
               <ProductCard
                 id={product.id}
                 name={product.name}
                 price={product.price}
-                imageUrl={"/images/products/ourobranco.jpg"}
+                imageUrl={
+                  product.image_url 
+                    ? product.image_url 
+                    : "/images/placeholder.png"
+                }
               />
             </li>
           ))}
