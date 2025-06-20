@@ -38,4 +38,26 @@ const addCredits = async (req, res) => {
   }
 };
 
-module.exports = { addCredits };
+const getCredits = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const { data, error } = await supabase
+      .from('user_credits')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (error) throw error;
+
+    res.json({ balance: data.balance });
+  } catch (err) {
+    console.error('Erro ao buscar créditos:', err);
+    res.status(500).json({ error: 'Erro ao buscar créditos' });
+  }
+};
+
+module.exports = {
+  addCredits,
+  getCredits,
+};

@@ -5,7 +5,8 @@ const app = express();
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require ('./routes/productsRoutes')
 const categoriesRoutes = require('./routes/categoriesRoutes');
-const ordersRoutes = require('./routes/ordersRoutes'); 
+const ordersRoutes = require('./routes/ordersRoutes');
+const creditsRoutes = require('./routes/creditsRoutes');
 
 
 app.use(cors({
@@ -18,6 +19,7 @@ app.use('/', authRoutes);
 app.use('/products', productRoutes);
 app.use('/categories', categoriesRoutes);
 app.use('/orders', ordersRoutes);
+app.use('/api/credits', creditsRoutes);
 
 
 app.listen(3001, () => {
