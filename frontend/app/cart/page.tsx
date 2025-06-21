@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createOrder, getUserOrders } from "@/services/orderService"
+import FixedMenu from "@/components/FixedMenu"
 import { useCart } from "@/app/context/CartContext"
 
 interface Order {
