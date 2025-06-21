@@ -2,71 +2,82 @@
 
 import { useState, useEffect } from "react"
 import { createOrder, getUserOrders } from "@/services/orderService"
+import { useCart } from "@/app/context/CartContext"
 import FixedMenu from "@/components/FixedMenu"
-
-interface CartItem {
-  id: string
-  name: string
-  price: number
-  quantity: number
-  imageUrl?: string
-}
 
 interface Order {
   id: string
   items: {
     productId: string
     quantity: number
-    name?: string
     price?: number
   }[]
-  total: number
-  createdAt: string
+  created_At: string
   status: string
 }
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const { cartItems, removeFromCart } = useCart()
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState<Order[]>([])
   const [showOrders, setShowOrders] = useState(false)
+  const [credits, setCredits] = useState<number | null>(null)
 
   useEffect(() => {
-    // Carrega itens do carrinho do localStorage (opcional)
-    const savedCart = localStorage.getItem('cart')
-    if (savedCart) {
-      setCartItems(JSON.parse(savedCart))
-    } 
-    loadUserOrders()
-  }, [])
+    if (showOrders) {
+      loadUserOrders()
+    }
+    loadUserCredits()
+  }, [showOrders])
 
   const loadUserOrders = async () => {
     try {
       const token = localStorage.getItem("token") || ""
-      if (token) {
-        const userOrders = await getUserOrders(token)
-        setOrders(userOrders)
+      if (!token) {
+        console.warn("Token não encontrado. Usuário não autenticado.")
+        return
       }
+
+      const userOrders = await getUserOrders(token)
+      const normalizedOrders = (userOrders || []).map((order: any) => ({
+        ...order,
+        items: order.items.map((item: any) => ({
+          productId: item.product_id || item.productId,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      }))
+
+      console.log("Pedidos normalizados:", normalizedOrders)
+      setOrders(normalizedOrders)
     } catch (err) {
       console.error("Erro ao carregar pedidos:", err)
+      alert("Erro ao carregar pedidos")
+    }
+  }
+
+  const loadUserCredits = async () => {
+    try {
+      const token = localStorage.getItem("token") || ""
+      if (!token) return
+
+      const response = await fetch("http://localhost:3001/api/credits", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (!response.ok) throw new Error("Erro ao buscar créditos")
+
+      const data = await response.json()
+      console.log(data)
+      setCredits(data.balance)
+    } catch (err) {
+      console.error("Erro ao carregar créditos:", err)
+      setCredits(null)
     }
   }
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-
-  const updateQuantity = (id: string, quantity: number) => {
-    const newItems = cartItems.map(item =>
-      item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
-    )
-    setCartItems(newItems)
-    localStorage.setItem('cart', JSON.stringify(newItems))
-  }
-
-  const removeItem = (id: string) => {
-    const newItems = cartItems.filter(item => item.id !== id)
-    setCartItems(newItems)
-    localStorage.setItem('cart', JSON.stringify(newItems))
-  }
 
   const finalizePurchase = async () => {
     if (cartItems.length === 0) {
@@ -85,11 +96,8 @@ export default function CartPage() {
 
       const res = await createOrder(payload, token)
       alert(`Pedido criado com sucesso! ID: ${res.orderId}`)
-      setCartItems([])
       localStorage.removeItem('cart')
-      
-      // Atualiza a lista de pedidos após criar um novo
-      await loadUserOrders()
+      window.location.reload()
     } catch (err: any) {
       alert(err.message || "Erro ao criar pedido")
     } finally {
@@ -99,10 +107,16 @@ export default function CartPage() {
 
   return (
     <main className="min-h-screen p-6 bg-background">
-      <div className="my-25"><FixedMenu/></div>
-      <h1 className="text-2xl font-bold mb-6">Seu Carrinho</h1>
-      
-      <button 
+      <FixedMenu/>
+      <h1 className="text-2xl font-bold my-10">Seu Carrinho</h1>
+
+      {credits !== null && (
+        <p className="mb-6 text-primary font-semibold">
+          Créditos disponíveis: R$ {credits.toFixed(2)}
+        </p>
+      )}
+
+      <button
         onClick={() => setShowOrders(!showOrders)}
         className="mb-4 text-primary hover:underline"
       >
@@ -116,32 +130,39 @@ export default function CartPage() {
             <p className="text-muted-foreground">Você não possui pedidos.</p>
           ) : (
             <div className="space-y-4">
-              {orders.map(order => (
-                <div key={order.id} className="border rounded p-4 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold">Pedido #{order.id}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Data: {new Date(order.createdAt).toLocaleDateString()}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Status: {order.status}
+              {orders.map(order => {
+                const orderTotal = order.items.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0)
+                return (
+                  <div key={order.id} className="border rounded p-4 shadow-sm">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold">Pedido #{order.id}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Data: {order.created_At ? new Date(order.created_At).toLocaleDateString() : '--'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Status: {order.status}
+                        </p>
+                      </div>
+                      <p className="font-bold">
+                        Total: R$ {orderTotal.toFixed(2)}
                       </p>
                     </div>
-                    <p className="font-bold">Total: R$ {order.total.toFixed(2)}</p>
+
+                    <div className="mt-3 border-t pt-3">
+                      <h3 className="font-medium mb-2">Itens:</h3>
+                      {order.items.map(item => (
+                        <div key={item.productId} className="flex justify-between py-1">
+                          <span>{item.productId ? `Produto ${item.productId.substring(0, 6)}...` : 'Produto indefinido'}</span>
+                          <span>
+                            {item.quantity} x R$ {item.price !== undefined ? item.price.toFixed(2) : '--'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  
-                  <div className="mt-3 border-t pt-3">
-                    <h3 className="font-medium mb-2">Itens:</h3>
-                    {order.items.map(item => (
-                      <div key={item.productId} className="flex justify-between py-1">
-                        <span>{item.name || `Produto ${item.productId}`}</span>
-                        <span>{item.quantity} x R$ {item.price?.toFixed(2) || '--'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -158,32 +179,30 @@ export default function CartPage() {
                   )}
                   <div className="flex-1">
                     <p className="font-semibold">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">R$ {item.price.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      R$ {item.price !== undefined ? item.price.toFixed(2) : '--'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
-                      className="w-16 border rounded px-2 py-1"
-                    />
+                    <span className="text-sm">Qtd: {item.quantity}</span>
                     <button
-                      onClick={() => removeItem(item.id)}
+                      onClick={() => removeFromCart(item.id)}
                       className="text-red-500 hover:underline text-sm"
                     >
                       Remover
                     </button>
                   </div>
                   <div className="font-bold w-20 text-right">
-                    R$ {(item.price * item.quantity).toFixed(2)}
+                    R$ {(item.price && item.quantity) ? (item.price * item.quantity).toFixed(2) : '--'}
                   </div>
                 </div>
               ))}
 
               <div className="border-t pt-4 flex justify-between items-center">
                 <p className="text-lg font-bold">Total:</p>
-                <p className="text-lg font-bold">R$ {total.toFixed(2)}</p>
+                <p className="text-lg font-bold">
+                  R$ {total ? total.toFixed(2) : '--'}
+                </p>
               </div>
 
               <button

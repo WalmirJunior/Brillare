@@ -23,7 +23,7 @@ export default function ProductPage() {
   const [quantity, setQuantity] = useState(1)
   const router = useRouter()
   const params = useParams()
-  const { addToCart } = useCart()
+  const { addToCart, cartItems } = useCart()
   const id = params.id as string
 
   useEffect(() => {
@@ -40,6 +40,11 @@ export default function ProductPage() {
         alert("Erro ao buscar produto: " + err.message)
       })
   }, [id])
+
+  // Sincroniza carrinho com localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cartItems))
+  }, [cartItems])
 
   if (!product) {
     return (
