@@ -17,7 +17,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const data = await login(email, password);
+      const data = await login(email, password) as { token: string };
       localStorage.setItem("token", data.token);
       router.push("/home"); 
     } catch (err: any) {
