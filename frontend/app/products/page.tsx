@@ -26,7 +26,8 @@ export default function ProductsPage() {
           return
         }
 
-        const res = await getAllProducts(token) as Product[]
+        const res = await getAllProducts() as Product[]
+
 
         console.log("Produtos carregados:", res)
 
