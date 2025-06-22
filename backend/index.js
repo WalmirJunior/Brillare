@@ -10,7 +10,7 @@ const creditsRoutes = require('./routes/creditsRoutes');
 
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://ec2-54-234-196-249.compute-1.amazonaws.com'],
+  origin: '*',
   credentials: true, 
 }));
 
