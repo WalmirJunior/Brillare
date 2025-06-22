@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:3001";
+const API_BASE_URL = "/api";
+
 
 export async function apiRequest<T = any>(
   endpoint: string,
