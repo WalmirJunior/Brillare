@@ -3,7 +3,8 @@ export interface CartItemPayload {
   quantity: number
 }
 
-const API_URL = "http://localhost:3001/orders"  
+const API_URL = "http://ec2-54-234-196-249.compute-1.amazonaws.com:3001/orders"
+
 
 export const createOrder = async (items: CartItemPayload[], token: string) => {
   try {
