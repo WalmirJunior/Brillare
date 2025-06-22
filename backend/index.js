@@ -22,6 +22,6 @@ app.use('/orders', ordersRoutes);
 app.use('/api/credits', creditsRoutes);
 
 
-app.listen(80, '0.0.0.0', () => {
+app.listen(3001, '0.0.0.0', () => {
   console.log('Servidor rodando na porta 3001');
 });
