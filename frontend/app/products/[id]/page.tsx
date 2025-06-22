@@ -34,7 +34,7 @@ export default function ProductPage() {
     }
 
     getProductById(id, token)
-      .then(res => setProduct(res))
+      .then(res => setProduct(res as Product))
       .catch(err => {
         console.error("Erro ao buscar produto:", err)
         alert("Erro ao buscar produto: " + err.message)
@@ -69,7 +69,7 @@ export default function ProductPage() {
     <main className="min-h-screen p-6 bg-background">
       <FixedMenu/>
       <Breadcrumb 
-        categoryName={product.categoryName}
+        categoryName={product.categoryName ?? ''}
         productName={product.name}
       />
       <div>
