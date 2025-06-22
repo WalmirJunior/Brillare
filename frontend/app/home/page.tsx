@@ -27,7 +27,7 @@ export default function HomePage() {
     }
 
     getAllProducts(token)
-      .then((res) => setProducts(res))
+      .then((res) => setProducts(res as Product[]))
       .catch((err) => {
         console.error("Erro ao buscar produtos:", err)
         alert("Erro ao buscar produtos: " + err.message)
