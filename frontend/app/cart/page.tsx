@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { createOrder, getUserOrders } from "@/services/orderService"
 import { useCart } from "@/app/context/CartContext"
 import FixedMenu from "@/components/FixedMenu"
+import { supabase } from '@/services/supabaseClient'
 
 interface Order {
   id: string
@@ -38,7 +39,7 @@ export default function CartPage() {
         return
       }
 
-      const userOrders = await getUserOrders(token)
+      const userOrders = await getUserOrders()
       const normalizedOrders = (userOrders || []).map((order: any) => ({
         ...order,
         items: order.items.map((item: any) => ({
@@ -55,6 +56,7 @@ export default function CartPage() {
       alert("Erro ao carregar pedidos")
     }
   }
+  
 
   const loadUserCredits = async () => {
     try {
@@ -80,30 +82,41 @@ export default function CartPage() {
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
   const finalizePurchase = async () => {
-    if (cartItems.length === 0) {
-      alert("Seu carrinho está vazio.")
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const token = localStorage.getItem("token") || ""
-      const payload = cartItems.map(item => ({
-        productId: item.id,
-        quantity: item.quantity
-      }))
-
-      const res = await createOrder(payload, token)
-      alert(`Pedido criado com sucesso! ID: ${res.orderId}`)
-      localStorage.removeItem('cart')
-      window.location.reload()
-    } catch (err: any) {
-      alert(err.message || "Erro ao criar pedido")
-    } finally {
-      setLoading(false)
-    }
+  if (cartItems.length === 0) {
+    alert("Seu carrinho está vazio.")
+    return
   }
+
+  setLoading(true)
+
+  try {
+    // 🟢 Busca o usuário autenticado via Supabase
+    const {
+      data: { user },
+      error: userError
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      throw new Error("Usuário não autenticado")
+    }
+
+    const userId = user.id // ✅ Isso é o UUID correto
+
+    const payload = cartItems.map(item => ({
+      productId: item.id,
+      quantity: item.quantity
+    }))
+
+    const res = await createOrder(payload, userId)
+    alert(`Pedido criado com sucesso! ID: ${res.orderId}`)
+    localStorage.removeItem('cart')
+    window.location.reload()
+  } catch (err: any) {
+    alert(err.message || "Erro ao criar pedido")
+  } finally {
+    setLoading(false)
+  }
+}
 
   return (
     <main className="min-h-screen p-6 bg-background">

@@ -20,19 +20,14 @@ export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/")
-      return
-    }
+  getAllProducts()
+    .then((res) => setProducts(res as Product[]))
+    .catch((err) => {
+      console.error("Erro ao buscar produtos:", err)
+      alert("Erro ao buscar produtos: " + err.message)
+    })
+}, [])
 
-    getAllProducts(token)
-      .then((res) => setProducts(res as Product[]))
-      .catch((err) => {
-        console.error("Erro ao buscar produtos:", err)
-        alert("Erro ao buscar produtos: " + err.message)
-      })
-  }, [])
 
   const carouselImages = [
     "images/banner1.png",

@@ -6,8 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
-import { login } from "@/services/authService"
-
+import { supabase } from "@/services/supabaseClient"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -15,16 +14,26 @@ export default function LoginPage() {
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
-      const data = await login(email, password) as { token: string };
-      localStorage.setItem("token", data.token);
-      router.push("/home"); 
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw new Error(error.message)
+
+      if (data.session) {
+        localStorage.setItem("token", data.session.access_token)
+        router.push("/home")
+      } else {
+        throw new Error("Login falhou. Tente novamente.")
+      }
+
     } catch (err: any) {
-      alert(err.message || "Erro ao fazer login");
+      alert(err.message || "Erro ao fazer login")
     }
-  };
-  
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -66,7 +75,6 @@ export default function LoginPage() {
             <p className="text-sm text-center">
               Não tem conta? <a href="/register" className="text-primary underline">Cadastre-se</a>
             </p>
-
           </form>
         </CardContent>
       </Card>
