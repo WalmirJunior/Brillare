@@ -50,8 +50,6 @@ export default function ProductsPage() {
     loadProducts()
     
   }, [])
-
-  // Agrupa os produtos por categoria
   const productsByCategory = products.reduce<Record<string, Product[]>>((acc, product) => {
     if (!acc[product.category]) {
       acc[product.category] = []

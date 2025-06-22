@@ -41,7 +41,6 @@ export default function ProductPage() {
       })
   }, [id])
 
-  // Sincroniza carrinho com localStorage sempre que mudar
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cartItems))
   }, [cartItems])
@@ -60,7 +59,7 @@ export default function ProductPage() {
       name: product.name,
       price: product.price,
       quantity,
-      imageUrl: product.image_url // Pode usar a principal no carrinho
+      imageUrl: product.image_url 
     })
     alert("Produto adicionado ao carrinho!")
   }

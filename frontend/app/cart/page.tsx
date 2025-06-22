@@ -61,7 +61,7 @@ export default function CartPage() {
       const token = localStorage.getItem("token") || ""
       if (!token) return
 
-      const response = await fetch("http://localhost:3001/api/credits", {
+      const response = await fetch("http://ec2-54-234-196-249.compute-1.amazonaws.com:3001/credits", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
