@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://ec2-54-234-196-249.compute-1.amazonaws.com:3001";
+const API_BASE_URL = "http://ec2-54-234-196-249.compute-1.amazonaws.com";
 
 
 
