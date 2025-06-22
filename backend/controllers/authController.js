@@ -21,16 +21,26 @@ const register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const { data, error } = await supabase
+    const { data: newUser, error: userError } = await supabase
       .from('users')
       .insert([{ name, email, password: hashedPassword, role: 'user' }])
       .select()
       .single();
 
-    if (error) throw error;
+    if (userError) throw userError;
+
+    // 💥 Agora cria o crédito inicial
+    const { error: creditError } = await supabase
+      .from('user_credits')
+      .insert([{ user_id: newUser.id, balance: 999999 }]);
+
+    if (creditError) {
+      console.error('Erro ao criar créditos iniciais:', creditError.message);
+      // Aqui você pode decidir: falhar geral ou só avisar. Vamos só avisar por enquanto
+    }
 
     const token = jwt.sign(
-      { id: data.id, role: data.role },
+      { id: newUser.id, role: newUser.role },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -38,10 +48,10 @@ const register = async (req, res) => {
     res.status(201).json({
       message: 'Usuário registrado com sucesso',
       user: {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        role: data.role,
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
       },
       token,
     });
