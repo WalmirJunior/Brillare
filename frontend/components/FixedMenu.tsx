@@ -40,7 +40,7 @@ export default function FixedMenu() {
         </SheetContent>
       </Sheet>
 
-      <div className="text-xl font-bold">Brillare</div>
+      <div className="text-xl font-bold"><a href="/home">Brillare</a></div>
 
       <div className="flex items-center gap-4">
         <button onClick={goToCart}>
